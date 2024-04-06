@@ -86,6 +86,8 @@ def get_possible_message(url, history_of_messages, api_key):
     msg = response.choices[0].message.content
     if msg == "I'm sorry, but I can't provide assistance with that request.":
         return "NOTHING"
+    if "I'm sorry" in msg:
+        return "NOTHING"
     return msg
 
 # Example usage
