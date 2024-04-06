@@ -1,6 +1,10 @@
 import requests
 import base64
+import os
+import uuid
+
 from google.cloud import secretmanager
+from google.cloud import storage
 from openai import OpenAI
 
 
@@ -16,12 +20,27 @@ def get_secret():
     return response.payload.data.decode("UTF-8")
 
 
-API_URL = 'https://api.openai.com/v1/images'
+def upload_to_gcs(bucket_name, source_file_name):
+    """Uploads a file to Google Cloud Storage with a random file name."""
+    storage_client = storage.Client(project="personal-atc")
+    bucket = storage_client.bucket(bucket_name)
+    
+    # Generate a random file name
+    extension = os.path.splitext(source_file_name)[1]
+    random_file_name = f"{uuid.uuid4()}{extension}"
+    
+    blob = bucket.blob(random_file_name)
+
+    blob.upload_from_filename(source_file_name)
+
+    # Make the blob publicly viewable
+    blob.make_public()
+
+    return blob.public_url
 
 
-def ask_question_about_image(image_id, question, api_key):
-    url = "https://storage.googleapis.com/images_from_client/image.jpg"
-    client = OpenAI(key=api_key)
+def ask_question_about_image(url, question, api_key):
+    client = OpenAI(api_key=api_key)
 
     response = client.chat.completions.create(
     model="gpt-4-vision-preview",
@@ -29,11 +48,11 @@ def ask_question_about_image(image_id, question, api_key):
         {
         "role": "user",
         "content": [
-            {"type": "text", "text": "What’s in this image?"},
+            {"type": "text", "text": question},
             {
             "type": "image_url",
             "image_url": {
-                "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                "url": url,
             },
             },
         ],
