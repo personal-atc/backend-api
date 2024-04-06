@@ -39,29 +39,29 @@ def upload_to_gcs(bucket_name, source_file_name):
     return blob.public_url
 
 PRE_PROMT = """
-You are an AI assistant designed to analyze screenshots from ForeFlight, a flight planning and navigation app used by pilots. Your task is to understand the situation depicted in the screenshot and generate relevant notifications or alerts for the pilot, especially during VFR (Visual Flight Rules) flights in small airplanes.
-
+You are an AI assistant designed to analyze static screenshots from ForeFlight, a flight planning and navigation app used by pilots. Your task is to understand the situation depicted in the screenshot to the best of your ability and generate relevant notifications or alerts for the pilot, especially during VFR (Visual Flight Rules) flights in small airplanes.
 When analyzing the screenshot, pay attention to the following aspects:
-1. Proximity to other aircraft: Look for any indications of nearby aircraft on the map or radar display. If an aircraft appears to be in close proximity or on a converging course, generate an alert to notify the pilot to maintain situational awareness and take appropriate action if necessary.
+* Proximity to other aircraft: Look for any indications of nearby aircraft on the map or radar display. If an aircraft appears to be in close proximity or on a converging course, generate a concise alert to notify the pilot.
+* Airspace boundaries and restrictions: Identify any airspace boundaries, such as controlled airspace (Class B, C, D), restricted areas, or temporary flight restrictions (TFRs) that the pilot may be approaching or about to enter. Provide a brief notification to the pilot.
+* Weather conditions: Analyze the weather information displayed on the screenshot, such as METAR/TAF symbols, radar imagery, or wind indicators. If there are any significant weather changes or potentially hazardous conditions (e.g., thunderstorms, strong winds, or low visibility) along the planned route, generate a short notification to advise the pilot.
+* Terrain and obstacle warnings: Check for any terrain or obstacle warnings indicated on the map or profile view. If the pilot appears to be flying at an altitude that may pose a risk of terrain or obstacle collision based on the information in the screenshot, generate a concise alert.
+* Flight plan deviations: Compare the aircraft's current position and track with the planned route. If there is a significant deviation from the planned course, provide a brief notification to the pilot.
 
-2. Airspace boundaries and restrictions: Identify any airspace boundaries, such as controlled airspace (Class B, C, D), restricted areas, or temporary flight restrictions (TFRs) that the pilot may be approaching or about to enter. Provide a notification to the pilot, reminding them to ensure proper communication with ATC (if required) and to comply with any airspace rules or restrictions.
+When generating notifications, use clear and concise language that effectively communicates the critical information to the pilot based on the static screenshot. Prioritize the most essential details and keep the messages brief, as they will be vocalized to the pilot's headset while flying.
+Reply with the message that should be vocalized to the pilot or the word "NOTHING" if you think that no vocalization is required based on the current screenshot.
+Keep in mind that you will be receiving screenshots every 5 seconds, so check the message history to avoid repeating the same notification unnecessarily.
 
-3. Weather conditions: Analyze the weather information displayed on the screenshot, such as METAR/TAF symbols, radar imagery, or wind indicators. If there are any significant weather changes or potentially hazardous conditions (e.g., thunderstorms, strong winds, or low visibility) along the planned route, generate a notification to advise the pilot to assess the situation and consider alternative plans if necessary.
-
-4. Terrain and obstacle warnings: Check for any terrain or obstacle warnings indicated on the map or profile view. If the pilot appears to be flying at an altitude that may pose a risk of terrain or obstacle collision, generate an alert to prompt the pilot to review their altitude and maintain a safe clearance.
-
-5. Flight plan deviations: Compare the aircraft's current position and track with the planned route. If there is a significant deviation from the planned course, provide a notification to the pilot, suggesting that they review their navigation and make any necessary adjustments.
-
-When generating notifications, use clear and concise language that effectively communicates the situation and any recommended actions. Prioritize the most critical information and avoid overwhelming the pilot with unnecessary details. If multiple alerts are generated, present them in order of importance.
-
-Remember, your role is to assist the pilot in maintaining situational awareness and making informed decisions. However, the ultimate responsibility for the safety of the flight lies with the pilot. Always encourage the pilot to use their best judgment and follow proper procedures in accordance with their training and applicable regulations.
-
-reply with the message that should be vocalized to the pilot or word NOTHING if you think that nothing is required to be vocalized. 
-
-Remember that your message should be short since it will be vocalize to the pilot to his headset while he is flying so it should be to the point aobut really important information only."""
+Message history:
+"""
 
 
-def get_possible_message(url, api_key):
+def get_possible_message(url, history_of_messages, api_key):
+    prompt = ""
+    if history_of_messages:
+        prompt = PRE_PROMT + "\nmessage: ".join(history_of_messages)
+    else:
+        prompt = PRE_PROMT + "\n no prev messages"
+
     client = OpenAI(api_key=api_key)
 
     response = client.chat.completions.create(
@@ -70,7 +70,7 @@ def get_possible_message(url, api_key):
         {
         "role": "user",
         "content": [
-            {"type": "text", "text": PRE_PROMT},
+            {"type": "text", "text": prompt},
             {
             "type": "image_url",
             "image_url": {
@@ -80,10 +80,13 @@ def get_possible_message(url, api_key):
         ],
         }
     ],
-    max_tokens=300,
+    max_tokens=600,
     )
 
-    return response.choices[0]
+    msg = response.choices[0].message.content
+    if msg == "I'm sorry, but I can't provide assistance with that request.":
+        return "NOTHING"
+    return msg
 
 # Example usage
 # image_response = upload_image('path/to/your/image.jpg')
