@@ -1,46 +1,51 @@
 import requests
 import base64
+from google.cloud import secretmanager
+from openai import OpenAI
 
-# Set up the Secret Manager client
-client = secretmanager.SecretManagerServiceClient()
 
-# Specify the secret name and version
-secret_name = "projects/69026013544/secrets/openai_key/versions/1"
+def get_secret():
+    # Set up the Secret Manager client
+    client = secretmanager.SecretManagerServiceClient()
 
-# Access the secret
-response = client.access_secret_version(request={"name": secret_name})
-api_key = response.payload.data.decode("UTF-8")
+    # Specify the secret name and version
+    secret_name = "projects/69026013544/secrets/openai_key/versions/1"
 
-# Set up your API key and endpoint
-api_key = "your_api_key"
-url = "https://api.openai.com/v1/images/generations"
+    # Access the secret
+    response = client.access_secret_version(request={"name": secret_name})
+    return response.payload.data.decode("UTF-8")
 
-# Read the image file and convert it to base64
-with open("image.jpg", "rb") as image_file:
-    image_data = base64.b64encode(image_file.read()).decode("utf-8")
 
-# Set up the request payload
-payload = {
-    "prompt": "Question: What is the main subject of this image?",
-    "image": image_data
-}
+API_URL = 'https://api.openai.com/v1/images'
 
-# Set up the request headers
-headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
-}
 
-# Send the request to the GPT-4 API
-response = requests.post(url, json=payload, headers=headers)
+def ask_question_about_image(image_id, question, api_key):
+    url = "https://storage.googleapis.com/images_from_client/image.jpg"
+    client = OpenAI(key=api_key)
 
-# Check the response status code
-if response.status_code == 200:
-    # Parse the response JSON
-    result = response.json()
-    
-    # Extract the generated answer
-    answer = result["choices"][0]["text"]
-    print("GPT-4's answer:", answer)
-else:
-    print("Error:", response.status_code, response.text)
+    response = client.chat.completions.create(
+    model="gpt-4-vision-preview",
+    messages=[
+        {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "What’s in this image?"},
+            {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+            },
+            },
+        ],
+        }
+    ],
+    max_tokens=300,
+    )
+
+    return response.choices[0]
+
+# Example usage
+# image_response = upload_image('path/to/your/image.jpg')
+# if image_response:
+#     question_response = ask_question_about_image(image_response['image_id'], "What is in this image?")
+#     print(question_response)
