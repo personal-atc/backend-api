@@ -8,7 +8,7 @@ def tts_openai(message, api_key, bucket_name):
     if message == "NOTHING":
         return
 
-    print(message)
+    # print(message)
     client = OpenAI(api_key=api_key)
 
     response = client.audio.speech.create(
@@ -21,4 +21,4 @@ def tts_openai(message, api_key, bucket_name):
     file_name = f"{milliseconds}.mp3"
     response.stream_to_file(file_name)
 
-    upload_to_gcs(bucket_name, file_name)
+    return upload_to_gcs(bucket_name, file_name)
